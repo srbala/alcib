@@ -128,7 +128,40 @@ def sign_prep():
   Sign Preparation for staging
   """
   logging.info('In sign_prep ...')
-  execute_command(f'ls -al', os.getcwd())
+#  execute_command(f'ls -al >  folder.log', os.getcwd())
+  execute_command(f'cat CHECKSUMS', os.getcwd())
+#  execute_command(f'cat CHECKSUMS', os.getcwd())
+  r = open("CHECKSUMS", "r")
+  checksum_file = r.read().encode('utf-8')
+  settings.sign_jwt_token = os.getenv('SIGN_JWT_TOKEN')
+# settings.sign_jwt_token = base64.b64encode(os.getenv('SIGN_JWT_TOKEN'))
+  if settings.sign_jwt_token > " ":
+    logging.info("JWT token found")
+  else:
+    logging.info("JWT token not found")
+  headers = {
+    'accept': 'application/json',
+    'Authorization': f'Bearer {settings.sign_jwt_token}',
+    'Content-Type': 'application/json',
+  }
+  json_data = {
+    'content': f'{checksum_file}',
+    'pgp_keyid': '488FCF7C3ABB34F8',
+  }
+  logging.info('Before request ..')
+  response = requests.post(
+    'https://build.almalinux.org/api/v1/sign-tasks/sync_sign_task/',
+    headers=headers, json=json_data)
+  logging.info('After request ..')
+  content = json.loads(response.content.decode())
+  logging.info('received content')
+  for i in content:
+    value = content[i]
+    print("Key and Value pair are ({}) = ({})".format(i, value))
+    logging.info("Key({}) = Value({})".format(i, value))
+  pass
+  
+
   logging.info('Done with sign_prep ...!')
 
 def setup_logger():

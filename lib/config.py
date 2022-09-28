@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     ssh_key_file: str
     vagrant_cloud_access_key: str = ''
     build_number: str
-    image: str
+    image: str = ''
     aarch_username: str = ''
     amd_username: str = ''
     aarch_password: str = ''
