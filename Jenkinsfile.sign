@@ -1,0 +1,104 @@
+def performCreateStages(String hypervisor) {
+    return {
+        sh "python3 -u main.py --stage init --hypervisor ${hypervisor}"
+    }
+}
+
+def performBuildStages(String hypervisor) {
+    return {
+        sh "python3 -u main.py --stage build --hypervisor ${hypervisor}"
+    }
+}
+
+def performTestStages(String hypervisor) {
+    return {
+        sh "python3 -u main.py --stage test --hypervisor ${hypervisor}"
+    }
+}
+
+def performReleaseStages(String hypervisor) {
+    return {
+        sh "python3 -u main.py --stage release --hypervisor ${hypervisor}"
+    }
+}
+
+def performDestroyStages(String hypervisor) {
+    return {
+        sh "python3 -u main.py --stage destroy --hypervisor ${hypervisor}"
+    }
+}
+
+def performMock(String hypervisor) {
+    return {
+        sh "python3 -u main.py --stage mock --hypervisor ${hypervisor}"
+    }
+}
+pipeline {
+  agent any
+  parameters {
+      choice(name: 'OS_MAJOR_VER', choices: ['8', '9'], description: 'AlmaLinux Major Version')
+      choice(name: 'IMAGE', choices: ['Vagrant Box', 'AWS AMI', 'GenericCloud', 'OpenNebula'], description: 'Cloud image to update: build, test, release')
+      extendedChoice(defaultValue: 'VirtualBox', description: 'Hypervisors options to  build Vagrant Box', descriptionPropertyValue: '', multiSelectDelimiter: ',', name: 'HYPERVISORS', quoteValue: false, saveJSONParameterToFile: false, type: 'PT_MULTI_SELECT', value: 'VirtualBox, VMWare_Desktop, KVM, HyperV', visibleItemCount: 4)
+      string(name: 'BUCKET', defaultValue: 'alcib', description: 'S3 BUCKET NAME')
+      string(name: 'VAGRANT', defaultValue: 'almalinux/8', description: 'Vagrant Cloud path to upload')
+      booleanParam(defaultValue: true, description: 'Destroy AWS instance', name: 'DESTROY')
+  }
+  environment {
+      AWS_ACCESS_KEY_ID = credentials('jenkins-aws-access-key-id')
+      AWS_SECRET_ACCESS_KEY = credentials('jenkins-aws-secret-access-key')
+      VAGRANT_CLOUD_ACCESS_KEY = credentials('jenkins-vagrant-user-access-key')
+      SSH_KEY_FILE = credentials('jenkins-aclib-ssh-private-key')
+      WINDOWS_CREDS = credentials('jenkins-windows-creds')
+      OS_MAJOR_VER = "${params.OS_MAJOR_VER}"
+  }
+
+  options {
+    // This is required if you want to clean before build
+    skipDefaultCheckout(true)
+  }
+  stages {
+    stage('Prepare Workspace') {
+        steps {
+            // Clean before build
+            cleanWs()
+            // We need to explicitly checkout from SCM here
+            checkout scm
+            echo "Building ${env.JOB_NAME}..."
+        }
+    } 
+    stage('Testing for Mock') {
+        steps {
+            script {
+                def jobs = [:]
+                for (hv in params.HYPERVISORS.replace('"', '').split(',')) {
+                    jobs[hv] = performCreateStages(hv)
+                }
+                parallel jobs
+            }
+        }
+    }
+  }
+
+  post {
+      always {
+          archiveArtifacts artifacts: '*.log'
+      }
+      success {
+          slackSend channel: '#albs-jenkins-notifications',
+                    color: 'good',
+                    message: "The build ${currentBuild.fullDisplayName} completed successfully : ${currentBuild.absoluteUrl}"
+      }
+      failure {
+        echo "Job Failed ..."
+        //   slackSend channel: '#albs-jenkins-action-required',
+        //             color: 'danger',
+        //             message: "The build ${currentBuild.fullDisplayName} failed : ${currentBuild.absoluteUrl}"
+      }
+      aborted {
+        echo "Job Aborted ..."
+        //   slackSend channel: '#albs-jenkins-action-required',
+        //             color: 'warning',
+        //             message: "The build ${currentBuild.fullDisplayName} was aborted : ${currentBuild.absoluteUrl}"
+        }
+      }
+  }

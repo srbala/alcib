@@ -6,6 +6,7 @@
 Script for building Vagrant Boxes.
 """
 
+from re import S
 import sys
 import argparse
 import logging
@@ -17,7 +18,7 @@ import requests
 from lib.builder import Builder
 from lib.hypervisors import get_hypervisor, TIMESTAMP
 from lib.config import settings
-from lib.utils import get_git_branches
+from lib.utils import get_git_branches, execute_command
 
 
 headers = {
@@ -39,13 +40,13 @@ def init_args_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument('--hypervisor', type=str,
                         choices=['VirtualBox', 'KVM', 'VMWare_Desktop',
-                                 'HyperV', 'AWS-STAGE-2', 'Equinix'],
+                                 'HyperV', 'AWS-STAGE-2', 'Equinix', 'BaseAgent'],
                         help='Hypervisor name', required=False)
     parser.add_argument('--stage', type=str,
                         choices=['init', 'build', 'destroy',
-                                 'test', 'release', 'pullrequest'],
+                                 'test', 'release', 'pullrequest', 'mock'],
                         help='Stage')
-    parser.add_argument('--arch', type=str, choices=['x86_64', 'aarch64', 'ppc64le'],
+    parser.add_argument('--arch', type=str, choices=['x86_64', 'aarch64', 'ppc64le', 's390x'],
                         help='Architecture', required=False, default='x86_64')
     return parser
 
@@ -122,6 +123,14 @@ def create_new_branch():
         logging.info(response.content.decode())
 
 
+def sign_prep():
+  """
+  Sign Preparation for staging
+  """
+  logging.info('In sign_prep ...')
+  execute_command(f'ls -al', os.getcwd())
+  logging.info('Done with sign_prep ...!')
+
 def setup_logger():
     """
     Setup for logger.
@@ -149,6 +158,8 @@ def main(sys_args):
 
     if args.stage == 'pullrequest':
         almalinux_wiki_pr()
+    elif args.stage == 'mock':
+        sign_prep()
     else:
         hypervisor = get_hypervisor(args.hypervisor.lower(), args.arch)
 
