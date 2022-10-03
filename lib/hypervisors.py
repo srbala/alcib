@@ -383,9 +383,15 @@ class BaseHypervisor:
             Builder on AWS Instance.
         """
         ssh = builder.ssh_aws_connect(self.instance_ip, self.name)
+        logging.info ('BALA: Get folder content ...')
+        stdout, _ = ssh.safe_execute(
+            f'bash -c "ls -al {self.cloud_images_path}"'
+        )
+        logging.info(stdout.read().decode())
         logging.info('Creating new version for Vagrant Cloud')
         box = f'https://app.vagrantup.com/api/v1/box/{settings.vagrant}'
         version = os.environ.get('VERSION')
+        logging.info(f'BALA: {box}/version/{version}')
         stdout, _ = ssh.safe_execute(
             f'bash -c "sha256sum {self.cloud_images_path}/*.box"'
         )
